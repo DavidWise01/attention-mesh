@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE ATTENTION MESH · causal attention as a weighted graph · ROOT0</title>
+<meta name="description" content="THE ATTENTION MESH by David Lee Wise / ROOT0: causal attention drawn as its honest topology — a complete weighted directed graph, not two strands and not a funnel. A 2D chord diagram (attention woven through a ring; sinks orange, recency green) and a 3D inverse helix (a query ring on top, a key ring below, each weight a strand bowing through the interior; every query's strongest strand bundles to the same sink point). AMBER tier: weights are MODELED to reproduce documented attention structure (sinks, recency, heavy tail), not extracted from a trained network — but the topology is exact. Offline, single file, no runtime network, fail-loud.">
+<meta name="theme-color" content="#FF5A00">
+<meta property="og:type" content="website">
+<meta property="og:title" content="THE ATTENTION MESH · causal attention as a weighted graph">
+<meta property="og:description" content="Attention's honest topology: a complete weighted directed graph, not a funnel. A 2D chord diagram + a 3D inverse helix (query ring to key ring, strands bundling to the sink). Amber tier — modeled weights, exact topology. The topology-companion to THE ATTENTION HOURGLASS.">
+<meta property="og:url" content="https://davidwise01.github.io/attention-mesh/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="THE ATTENTION MESH">
+<meta name="twitter:description" content="Causal attention as a complete weighted directed graph — chord diagram + 3D inverse helix, sinks & recency marked. Amber: modeled weights, exact topology.">
+<link rel="canonical" href="https://davidwise01.github.io/attention-mesh/">
+<!--
+  THE ATTENTION MESH · David Lee Wise / ROOT0. Built on ROOT0's foundational
+  instrument scaffold: standalone single file, ZERO runtime network fetches,
+  system fonts only, fail-loud (any runtime error surfaces on the card, never
+  silent), verify-then-build (the attention model is checked in Node before the
+  draw blocks). 2D canvas = quantitative read; 3D soft-GL = spatial intuition
+  (3D projected by hand onto the 2D context — no WebGL, no library).
+-->
+<style>
+:root{
+  --bg:#0B0B0B; --ink:#F2EFE9; --org:#FF5A00; --dim:#7A756D; --line:#2A2620; --panel:#121110;
+  --green:#3FBF7F; --amber:#E0B050; --red:#E05555;
+  /* system stacks — no web fonts, truly offline. swap in Archivo/Plex only if you accept a fetch. */
+  --disp: system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,'SF Mono','Cascadia Code','Source Code Pro',Menlo,Consolas,'DejaVu Sans Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+
+header{border-bottom:3px solid var(--org);padding:24px 0 18px}
+header h1{font-family:var(--disp);font-weight:800;font-size:clamp(28px,5.5vw,52px);line-height:.95;text-transform:uppercase;letter-spacing:-.01em}
+header h1 span{color:var(--org)}
+header .sub{margin-top:10px;color:var(--dim);font-size:13px;max-width:640px;line-height:1.6}
+header .tier{display:inline-block;margin-top:12px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border:2px solid}
+header .tier.g{color:var(--green);border-color:var(--green)}
+header .tier.a{color:var(--amber);border-color:var(--amber)}
+header .tier.r{color:var(--red);border-color:var(--red)}
+
+section{padding:28px 0;border-bottom:1px solid var(--line)}
+.sec-h{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:14px}
+.viz{background:var(--panel);border:1px solid var(--line);border-radius:2px;position:relative;overflow:hidden}
+.viz-2d{height:400px}.viz-3d{height:460px}
+.viz canvas{display:block;width:100%;height:100%;touch-action:none}
+.viz .cap{position:absolute;left:12px;bottom:10px;font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
+.viz .badge{position:absolute;right:12px;top:10px;font-size:10px;color:var(--org);letter-spacing:.1em;text-transform:uppercase;border:2px solid var(--org);padding:2px 7px}
+.viz .hint{position:absolute;left:12px;top:10px;font-size:10px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;pointer-events:none}
+.viz .fb{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);padding:30px;text-align:center;color:var(--org);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.prose{font-size:13px;line-height:1.7;max-width:680px;color:var(--ink)}
+.prose b{color:var(--org)}
+footer{padding:22px 0 44px;font-size:11px;color:var(--dim);line-height:1.8}
+.ctrls{position:absolute;left:12px;bottom:10px;display:flex;align-items:center;gap:10px;z-index:3;flex-wrap:wrap}
+.ctrls label{font-size:10px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+.ctrls input[type=range]{width:130px;accent-color:var(--org)}
+.tog{background:var(--bg);color:var(--org);border:2px solid var(--org);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;cursor:pointer}
+.tog:hover{background:var(--org);color:var(--bg)}
+.tog:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.tog.on{border-color:var(--amber);color:var(--amber)}
+.poses{position:absolute;right:12px;bottom:10px;display:flex;gap:6px;z-index:3}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1 id="hTitle">THE ATTENTION <span>MESH</span></h1>
+    <div class="sub" id="hSub">The real topology under the waterfall: not two strands, but one sentence crossed with itself — a complete weighted graph. Tokens on a ring, attention woven through the interior. Your inverse-helix, made literal in 3D. Amber tier: modeled structure, real phenomena.</div>
+    <span class="tier a" id="hTier">AMBER — MODELED ATTENTION, REAL TOPOLOGY</span>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="sec-h">2D · Chord Diagram — the mesh flattened onto a ring</div>
+    <div class="viz viz-2d">
+      <canvas id="cv2"></canvas>
+      <div class="badge">CANVAS 2D</div>
+      <div class="ctrls"><label>highlight query <span id="qLab">16</span></label><input type="range" id="qSlider" min="0" max="31" value="16"><button id="allBtn" class="tog on">HIGHLIGHT ↔ ALL</button></div>
+      <div class="cap" id="cap2">demo: sine — replace in draw2D()</div>
+      <div class="fb" id="fb2">CANVAS 2D UNAVAILABLE</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-h">3D · Inverse Helix — strands woven through the interior</div>
+    <div class="viz viz-3d">
+      <canvas id="cv3"></canvas>
+      <div class="badge">SOFT-GL · NO GPU · NO LIB</div>
+      <div class="hint">DRAG ROTATE · WHEEL ZOOM</div>
+      <div class="cap" id="cap3">demo: lattice + orbit — replace in build3D()/draw3D()</div>
+      <div class="fb" id="fb3">RENDER FAILED — <span id="fb3why"></span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-h">Notes</div>
+    <p class="prose"><b>Why this shape, not a helix.</b> A double helix is two distinct strands bridged by exclusive one-to-one rungs. Attention is one sentence crossed with itself — the same tokens on both axes, connected many-to-one with graded weights. The honest topology is a <b>complete weighted directed graph</b>: every token can attend to every earlier token, each edge carrying a continuous weight. The 2D panel flattens that graph onto a ring — chords woven through the interior, colored by kind. The orange fan is the sink (every query reaches token 0); the green short chords are recency (neighbors attending to neighbors); grey is everything else.</p>
+    <p class="prose"><b>Your inverse-helix, made literal.</b> The 3D view takes your image at its word: turn the helix inside-out so the strands run through the interior of the circle. Query tokens ride the top ring, key tokens the bottom ring (the same sentence twice, in its two roles — looker and looked-at), and each attention weight is a strand bowing through the central axis from top to bottom. The sink becomes unmistakable: every query's strongest strand dives to the same point on the key ring — a <b>convergent bundle</b>, the funnel your eye kept seeing, now honestly a many-to-one gather rather than a pipe. A slight twist between the rings gives it the helical wind you pictured. Drag to rotate; toggle HIGHLIGHT to isolate one query's strands, ALL to see the full mesh.</p>
+    <p class="prose">Amber tier: the weights are modeled to reproduce documented attention structure (sinks, recency, heavy tail), not extracted from a trained network — but the <em>topology</em> is exact. This is genuinely how a causal attention layer connects: a self-crossed weighted graph, not two strands, not a funnel.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    THE ATTENTION MESH · David Lee Wise / ROOT0 / TriPod LLC · CC-BY-ND-4.0 · zero runtime deps · system fonts · fail-loud · amber tier: modeled weights, exact topology.<br>
+    companion · <a href="https://davidwise01.github.io/attention-hourglass/" style="color:var(--org)">THE ATTENTION HOURGLASS</a> (attention as flow, the funnel this mesh argues past) · <a href="https://davidwise01.github.io/ttu1/" style="color:var(--org)">TTU1 · TRANSFORMER TECH</a> · <a href="https://davidwise01.github.io/ud0/" style="color:var(--org)">UD0</a>
+  </div>
+</footer>
+
+<script>
+'use strict';
+// fail-loud: any uncaught error (including inside the animation loop) shows on the 3D card.
+window.addEventListener('error',function(e){
+  var fb=document.getElementById('fb3');if(fb){fb.style.display='flex';}
+  var w=document.getElementById('fb3why');if(w)w.textContent='RUNTIME: '+String(e.message||'?').toUpperCase().slice(0,90);
+});
+
+/* ==========================================================================
+   BLOCK 1 · PAPER  — edit metadata here
+   ========================================================================== */
+var PAPER={
+  title:'ATTENTION MESH',
+  tier:'a',
+  cap2:'32 tokens on a ring \u00b7 attention chords through the interior \u00b7 sink=orange, recency=green',
+  cap3:'inverse helix \u00b7 query ring (top) \u2192 key ring (bottom) \u00b7 sink strands bundle to one point'
+};
+
+// ===== attention model (N=32): modeled causal attention — sink + recency + heavy tail =====
+var ATT_N=32;
+function ATT_seedrnd(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+function ATT_logit(i,j,rnd){
+  if(j>i)return -Infinity;
+  if(j===0)return 3.0; if(j===1)return 1.2;
+  var L=-0.16*(i-j)+(rnd()-0.5)*1.3;
+  if((i*7+j*13)%17===0)L+=1.8; if(j===i)L+=0.6; return L;
+}
+function ATT_row(i){
+  var rnd=ATT_seedrnd(7+i*101), ls=[], mx=-Infinity;
+  for(var j=0;j<=i;j++){var l=ATT_logit(i,j,rnd);ls.push(l);if(l>mx)mx=l;}
+  var s=0,w=[];for(var j=0;j<=i;j++){var e=Math.exp(ls[j]-mx);w.push(e);s+=e;}
+  for(var j=0;j<=i;j++)w[j]/=s;
+  return w;
+}
+function ATT_topk(w,k){
+  return w.map(function(v,j){return {j:j,v:v};}).sort(function(a,b){return b.v-a.v;}).slice(0,k);
+}
+function ATT_edgeColor(i,j){
+  if(j===0)return [255,90,0];                 // sink
+  if(Math.abs(i-j)<=2)return [63,191,127];    // recency
+  return [139,147,156];                        // other
+}
+var ATT_query=16, ATT_all=true, ATT_K=4;
+// precompute edges once
+var ATT_edges=(function(){
+  var e=[];
+  for(var i=0;i<ATT_N;i++){ ATT_topk(ATT_row(i),ATT_K).forEach(function(ed){ if(ed.v>0.01)e.push({i:i,j:ed.j,v:ed.v}); }); }
+  return e;
+})();
+
+/* ==========================================================================
+   SGL ENGINE · reusable soft-GL — DO NOT EDIT (extend if you must)
+   3D projected by hand onto the 2d context. state + helpers.
+   ========================================================================== */
+var SGL={
+  yaw:0.4, pitch:0.15, dist:48, FOV:620, CY:7,   // camera state (CY = look-at height)
+  ctx:null, W:0, H:0, DPR:1, f:620,
+  rot:function(x,y,z){
+    var cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cx=Math.cos(this.pitch),sx=Math.sin(this.pitch);
+    var X=x*cy+z*sy, Z=-x*sy+z*cy, Y=(y-this.CY)*cx-Z*sx, Z2=(y-this.CY)*sx+Z*cx;
+    return [X,Y,Z2];
+  },
+  project:function(x,y,z){                        // -> [sx,sy,depth,scale] | null
+    var p=this.rot(x,y,z), zc=this.dist-p[2];
+    if(zc<0.5)return null;
+    var s=this.f/zc;
+    return [this.W/2+p[0]*s, this.H/2-p[1]*s, zc, s];
+  },
+  dot:function(x,y,z,r,col,alpha){
+    var p=this.project(x,y,z);if(!p)return;
+    var c=this.ctx;c.globalAlpha=alpha==null?1:alpha;c.fillStyle=col;
+    c.beginPath();c.arc(p[0],p[1],Math.max(0.6,r*p[3]),0,7);c.fill();c.globalAlpha=1;
+  },
+  line:function(x1,y1,z1,x2,y2,z2,col,w,dash){
+    this.path([[x1,y1,z1],[x2,y2,z2]],col,w,dash);
+  },
+  path:function(pts,col,w,dash){                  // polyline through 3D points, clips behind-cam gaps
+    var c=this.ctx;c.strokeStyle=col;c.lineWidth=(w||1)*this.DPR;
+    if(dash)c.setLineDash(dash.map(function(d){return d*this.DPR}.bind(this)));
+    c.beginPath();var started=false;
+    for(var i=0;i<pts.length;i++){
+      var p=this.project(pts[i][0],pts[i][1],pts[i][2]);
+      if(!p){started=false;continue;}
+      if(!started){c.moveTo(p[0],p[1]);started=true;}else c.lineTo(p[0],p[1]);
+    }
+    c.stroke();c.setLineDash([]);
+  },
+  ring:function(cx,cy,cz,r,axis,col,w,dash){      // circle; axis 'z' upright (xy), 'y' flat (xz)
+    var pts=[];for(var i=0;i<=48;i++){var a=i/48*Math.PI*2;
+      if(axis==='y')pts.push([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r]);
+      else pts.push([cx+Math.cos(a)*r,cy+Math.sin(a)*r,cz]);}
+    this.path(pts,col,w,dash);
+  },
+  cloud:function(points,colFn,rFn,alphaFn){       // painter-sorted point cloud; fns take (pt,index)
+    var self=this;
+    var buf=points.map(function(pt,i){return [pt,i,self.dist-self.rot(pt[0],pt[1],pt[2])[2]];});
+    buf.sort(function(a,b){return b[2]-a[2];});   // far first
+    buf.forEach(function(b){
+      var pt=b[0],i=b[1];
+      self.dot(pt[0],pt[1],pt[2], rFn?rFn(pt,i):0.3, colFn?colFn(pt,i):'#F2EFE9', alphaFn?alphaFn(pt,i):1);
+    });
+  },
+  text3:function(str,x,y,z,col,px){               // label anchored at a 3D point
+    var p=this.project(x,y,z);if(!p)return;
+    var c=this.ctx;c.fillStyle=col;c.font=((px||10)*this.DPR)+'px '+getComputedStyle(document.body).fontFamily;
+    c.textAlign='center';c.fillText(str,p[0],p[1]);
+  }
+};
+
+/* ==========================================================================
+   BLOCK 2 · draw2D — YOUR QUANTITATIVE VISUAL
+   gets a fresh cleared context each frame. (ctx, W, H, DPR, t) provided.
+   demo draws a sine; replace the body.
+   ========================================================================== */
+function draw2D(ctx,W,H,DPR,t){
+  var f=function(n){return n*DPR;};
+  var cx=W/2, cy=H*0.52, R=Math.min(W,H)*0.34;
+  function ring(k){var a=k/ATT_N*Math.PI*2-Math.PI/2;return [cx+Math.cos(a)*R, cy+Math.sin(a)*R];}
+  // faint ring outline
+  ctx.strokeStyle='#1B1815';ctx.lineWidth=DPR;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
+
+  // chords: quadratic bow toward center
+  var maxV=0;ATT_edges.forEach(function(e){if(e.v>maxV)maxV=e.v;});
+  function chord(e,dim){
+    var a=ring(e.i), b=ring(e.j);
+    var mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+    var ctrlx=cx+(mx-cx)*0.25, ctrly=cy+(my-cy)*0.25;   // pull toward center
+    var col=ATT_edgeColor(e.i,e.j);
+    var al=Math.min(1,e.v/maxV*1.3)*(dim?0.10:0.85);
+    ctx.strokeStyle='rgba('+col[0]+','+col[1]+','+col[2]+','+al.toFixed(3)+')';
+    ctx.lineWidth=f(dim?0.8:1.2+e.v*3);
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(ctrlx,ctrly,b[0],b[1]);ctx.stroke();
+  }
+  // draw dimmed background mesh first (if highlighting), then highlighted
+  if(ATT_all){ ATT_edges.forEach(function(e){chord(e,false);}); }
+  else{
+    ATT_edges.forEach(function(e){ if(e.i!==ATT_query)chord(e,true); });
+    ATT_edges.forEach(function(e){ if(e.i===ATT_query)chord(e,false); });
+  }
+  // token dots
+  for(var k=0;k<ATT_N;k++){
+    var p=ring(k), isSink=(k===0), isSel=(!ATT_all&&k===ATT_query);
+    ctx.fillStyle=isSink?'#FF5A00':(isSel?'#E0B050':'#7A756D');
+    ctx.beginPath();ctx.arc(p[0],p[1],f(isSink||isSel?4:2.2),0,7);ctx.fill();
+  }
+  // labels
+  var p0=ring(0);
+  ctx.fillStyle='#FF5A00';ctx.font=f(10)+'px '+MONO;ctx.textAlign='center';
+  ctx.fillText('token 0 (sink)',p0[0],p0[1]-f(10));
+  if(!ATT_all){var ps=ring(ATT_query);ctx.fillStyle='#E0B050';ctx.fillText('query '+ATT_query,ps[0],ps[1]-f(10));}
+
+  // legend + title
+  ctx.textAlign='left';ctx.font=f(10)+'px '+MONO;
+  ctx.fillStyle='#F2EFE9';ctx.fillText('one sentence crossed with itself \u2014 a complete weighted graph',f(14),f(18));
+  ctx.fillStyle='#FF5A00';ctx.fillText('\u25cf sink edges (to token 0)',f(14),f(34));
+  ctx.fillStyle='#3FBF7F';ctx.fillText('\u25cf recency edges (|i\u2212j|\u22642)',f(14),f(48));
+  ctx.fillStyle='#8B939C';ctx.fillText('\u25cf other',f(14),f(62));
+  ctx.fillStyle='#7A756D';ctx.textAlign='right';
+  ctx.fillText('edges shown ('+ATT_edges.length+', top-'+ATT_K+' per query)',W-f(14),f(18));
+}
+
+/* ==========================================================================
+   BLOCK 3 · build3D + draw3D — YOUR SPATIAL VISUAL
+   build3D() runs once, returns your geometry.
+   draw3D(t) runs each frame with SGL ready (SGL.ctx set, size current).
+   demo: a small lattice + one orbiting dot; replace both.
+   ========================================================================== */
+var SCENE;
+function build3D(){
+  var Rr=13, qy=SGL.CY+7, ky=SGL.CY-7, twist=0.10;   // small twist for helical feel
+  function qpos(k){var a=k/ATT_N*Math.PI*2-Math.PI/2; return [Math.cos(a)*Rr, qy, Math.sin(a)*Rr];}
+  function kpos(k){var a=k/ATT_N*Math.PI*2-Math.PI/2+twist; return [Math.cos(a)*Rr, ky, Math.sin(a)*Rr];}
+  var maxV=0;ATT_edges.forEach(function(e){if(e.v>maxV)maxV=e.v;});
+  return {Rr:Rr,qy:qy,ky:ky,qpos:qpos,kpos:kpos,maxV:maxV};
+}
+function draw3D(t){
+  var S=SCENE;
+  // the two rings (faint)
+  function ringPath(posf,col){var p=[];for(var k=0;k<=ATT_N;k++)p.push(posf(k%ATT_N));SGL.path(p,col,1);}
+  ringPath(S.qpos,'rgba(122,117,109,0.5)');
+  ringPath(S.kpos,'rgba(122,117,109,0.5)');
+  // strands: query-i (top) -> key-j (bottom), bowing toward central axis (inside the circle)
+  function strand(e,dim){
+    var a=S.qpos(e.i), b=S.kpos(e.j), col=ATT_edgeColor(e.i,e.j);
+    var pts=[];
+    for(var s=0;s<=8;s++){
+      var u=s/8;
+      // quadratic toward central axis midpoint
+      var mx=0,mz=0,my=(S.qy+S.ky)/2;
+      var x=(1-u)*(1-u)*a[0]+2*(1-u)*u*mx+u*u*b[0];
+      var y=(1-u)*(1-u)*a[1]+2*(1-u)*u*my+u*u*b[1];
+      var z=(1-u)*(1-u)*a[2]+2*(1-u)*u*mz+u*u*b[2];
+      pts.push([x,y,z]);
+    }
+    var al=Math.min(1,e.v/S.maxV*1.3)*(dim?0.08:0.8);
+    SGL.path(pts,'rgba('+col[0]+','+col[1]+','+col[2]+','+al.toFixed(3)+')', dim?0.8:1+e.v*2.5);
+  }
+  if(ATT_all){ ATT_edges.forEach(function(e){strand(e,false);}); }
+  else{
+    ATT_edges.forEach(function(e){if(e.i!==ATT_query)strand(e,true);});
+    ATT_edges.forEach(function(e){if(e.i===ATT_query)strand(e,false);});
+  }
+  // token dots on both rings; sink highlighted
+  for(var k=0;k<ATT_N;k++){
+    var q=S.qpos(k), kk=S.kpos(k);
+    SGL.dot(q[0],q[1],q[2], k===0?0.6:0.35, k===0?'#FF5A00':'#7A756D');
+    SGL.dot(kk[0],kk[1],kk[2], k===0?0.6:0.35, k===0?'#FF5A00':'#7A756D');
+  }
+  var k0=S.kpos(0);
+  SGL.text3('sink \u00b7 all strands bundle here', k0[0], k0[1]-2, k0[2], '#FF5A00', 9);
+  SGL.text3('QUERY ring', 0, S.qy+3, -S.Rr-1, '#7A756D', 9);
+  SGL.text3('KEY ring', 0, S.ky-3, -S.Rr-1, '#7A756D', 9);
+}
+
+/* ==========================================================================
+   RUNTIME · resize-safe loops, controls, fail-loud — DO NOT EDIT
+   ========================================================================== */
+var MONO;
+(function(){
+  MONO=getComputedStyle(document.body).fontFamily;
+  // apply PAPER metadata
+  document.getElementById('cap2').textContent=PAPER.cap2;
+  document.getElementById('cap3').textContent=PAPER.cap3;
+  var tierEl=document.getElementById('hTier');tierEl.className='tier '+PAPER.tier;
+  // mesh controls
+  var qs=document.getElementById('qSlider'), ql=document.getElementById('qLab'), ab=document.getElementById('allBtn');
+  if(qs)qs.addEventListener('input',function(){ATT_query=+qs.value;ql.textContent=qs.value;ATT_all=false;if(ab)ab.classList.remove('on');});
+  if(ab)ab.addEventListener('click',function(){ATT_all=!ATT_all;ab.classList.toggle('on',ATT_all);});
+
+  // ---- 2D loop ----
+  (function(){
+    var cv=document.getElementById('cv2'),ctx=cv.getContext&&cv.getContext('2d');
+    if(!ctx){document.getElementById('fb2').style.display='flex';return;}
+    var DPR=Math.min(window.devicePixelRatio||1,2),lastW=0,lastH=0,t=0;
+    function frame(){
+      requestAnimationFrame(frame);
+      var w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
+      if(w!==lastW||h!==lastH){lastW=w;lastH=h;cv.width=w*DPR;cv.height=h*DPR;}
+      t+=0.016;
+      ctx.fillStyle='#121110';ctx.fillRect(0,0,cv.width,cv.height);
+      draw2D(ctx,cv.width,cv.height,DPR,t);
+    }
+    frame();
+  })();
+
+  // ---- 3D loop (soft-GL) ----
+  (function(){
+    var cv=document.getElementById('cv3'),ctx=cv.getContext&&cv.getContext('2d');
+    if(!ctx){document.getElementById('fb3').style.display='flex';document.getElementById('fb3why').textContent='NO 2D CONTEXT';return;}
+    SGL.ctx=ctx;SCENE=build3D();
+    var lastW=0,lastH=0,t=0;
+    function resize(){
+      var w=cv.clientWidth||600,h=cv.clientHeight||460;if(!w||!h)return;
+      if(w===lastW&&h===lastH)return;lastW=w;lastH=h;
+      SGL.DPR=Math.min(window.devicePixelRatio||1,2);
+      cv.width=w*SGL.DPR;cv.height=h*SGL.DPR;SGL.W=cv.width;SGL.H=cv.height;
+      SGL.f=SGL.FOV*SGL.DPR*Math.min(w/1100,1.1);
+    }
+    // controls
+    var drag=false,px=0,py=0;
+    cv.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;py=e.clientY;});
+    window.addEventListener('pointermove',function(e){if(!drag)return;
+      SGL.yaw+=(e.clientX-px)*0.006;SGL.pitch=Math.max(-0.6,Math.min(0.7,SGL.pitch+(e.clientY-py)*0.004));
+      px=e.clientX;py=e.clientY;});
+    window.addEventListener('pointerup',function(){drag=false;});
+    cv.addEventListener('wheel',function(e){e.preventDefault();SGL.dist=Math.max(22,Math.min(95,SGL.dist+e.deltaY*0.03));},{passive:false});
+    function frame(){
+      requestAnimationFrame(frame);resize();if(!SGL.W)return;
+      if(!drag)SGL.yaw+=0.001;
+      t+=0.016;
+      ctx.fillStyle='#121110';ctx.fillRect(0,0,SGL.W,SGL.H);
+      draw3D(t);
+    }
+    frame();
+  })();
+})();
+</script>
+</body>
+</html>
